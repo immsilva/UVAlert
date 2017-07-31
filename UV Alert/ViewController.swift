@@ -332,7 +332,6 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
         do{
             var task = sendRequest(url: "http://dataservice.accuweather.com/locations/v1/cities/geoposition/search", parameters: queryParameters) { (data, response, error) in
                 
-                
                 print(String(describing: response)+"\n")
                 print("data: "+String(describing: data)+"\n")
                 if String(describing: response).range(of:"status code: 503") != nil{
