@@ -127,7 +127,7 @@ extension DispatchQueue {
     }
 }
 
-class ViewController: UIViewController, CLLocationManagerDelegate {
+class ViewController: UIViewController, CLLocationManagerDelegate, UNUserNotificationCenterDelegate {
     let apikey = "NiDthNJAAJhvqAeb0L4NB7CPB6YG302t"
     //location manager
     let manager = CLLocationManager()
@@ -140,6 +140,7 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
     var currentTemperature = String()
     var currentLocationCity = String()
     var currentLocationCountryCode = String()
+    var currentConditionsText = String()
     var checkDate = Date()
     var countGetIndex = 0
     
@@ -157,42 +158,7 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
     //What to do when location changes
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         location = locations[0] //get most recent position
-        /*
-         if(countGetIndex != 0){
-         print("THIS IS THE LOCATION")
-         DispatchQueue.background(background: {
-         // do something in background
-         self.getUVIndexBackground(waitDialog: false)
-         
-         }, completion:{
-         // when background job finished, do something in main thread
-         //check if it is between hours we want
-         let content = UNMutableNotificationContent()
-         content.title = "UV level for "+self.currentLocationCity
-         
-         if(self.uvIndex>=0 && self.uvIndex<=2){
-         content.subtitle = String(self.uvIndex)+" (Low)"
-         }else if(self.uvIndex>=3 && self.uvIndex<=5){
-         content.subtitle = String(self.uvIndex)+" (Moderate)"
-         }else if(self.uvIndex>=6 && self.uvIndex<=7){
-         content.subtitle = String(self.uvIndex)+" (High)"
-         }else if(self.uvIndex>=8 && self.uvIndex<=10){
-         content.subtitle = String(self.uvIndex)+" (Very High)"
-         }else if(self.uvIndex>=11){
-         content.subtitle = String(self.uvIndex)+" (Extreme)"
-         }
-         
-         // content.body = "This is the body"
-         content.badge = 1
-         
-         //display the notification
-         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
-         let request = UNNotificationRequest(identifier: "UVAlert", content: content, trigger: trigger)
-         UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
-         })
-         
-         }
-         */
+        
     }
     
     override func viewDidLoad() {
@@ -200,17 +166,20 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
         // Do any additional setup after loading the view, typically from a nib.
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBest //best location accuracy
+        
         manager.requestAlwaysAuthorization() //request for always get location
+        
         manager.startUpdatingLocation()
         
         //get notification permission
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge], completionHandler: {didAllow, error in })
+        UNUserNotificationCenter.current().delegate = self
+        
         
         //run code in the next second
         let date = Date().addingTimeInterval(0.1)
-        let timer = Timer(fireAt: date, interval: 0, target: self, selector: #selector(getUVIndex), userInfo: nil, repeats: false)
+        let timer = Timer(fireAt: date, interval: 0.5, target: self, selector: #selector(getUVIndex), userInfo: nil, repeats: false)
         RunLoop.main.add(timer, forMode: RunLoopMode.commonModes)
-        
         
         /*
         //notify in 5 seconds - START
@@ -220,14 +189,14 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
         //set notification badge number to zero
         UIApplication.shared.applicationIconBadgeNumber = 0
         //Notification - END
-         
         */
+        
+        
         refreshControl = UIRefreshControl()
         refreshControl.attributedTitle = NSAttributedString(string: "Pull to refresh")
         refreshControl.addTarget(self, action: #selector(refresh), for: UIControlEvents.valueChanged)
         scrollView.refreshControl = refreshControl
         //scrollView.addSubview(refreshControl) // not required when using UITableViewController
-        
         
     }
     
@@ -242,41 +211,50 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
         refreshControl.endRefreshing()
     }
     
+    func updateUI(){
+        self.uvIndexLabel.text = "UV level: " + String( self.uvIndex) + " (" + self.uvIndexText + ")"
+        //self.uvIndexLabel.text
+        self.setCurrentConditionsLabel()
+        sendNotification()
+    }
+    
+    //To display notifications when app is running  inforeground
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.alert, .sound, .badge])
+    }
+
+    
     func sendNotification(){
         
-        DispatchQueue.background(background: {
-            // do something in background
-            self.getUVIndexBackground(waitDialog: false)
+        print("Sending notification")
         
-        }, completion:{
-            // when background job finished, do something in main thread
-            //check if it is between hours we want
-            let content = UNMutableNotificationContent()
-            content.title = "UV level for "+self.currentLocationCity
-            if(self.uvIndex>=0 && self.uvIndex<=2){
-                content.subtitle = String(self.uvIndex)+" (Low)"
-            }else if(self.uvIndex>=3 && self.uvIndex<=5){
-                content.subtitle = String(self.uvIndex)+" (Moderate)"
-            }else if(self.uvIndex>=6 && self.uvIndex<=7){
-                content.subtitle = String(self.uvIndex)+" (High)"
-            }else if(self.uvIndex>=8 && self.uvIndex<=10){
-                content.subtitle = String(self.uvIndex)+" (Very High)"
-            }else if(self.uvIndex>=11){
-                content.subtitle = String(self.uvIndex)+" (Extreme)"
-            }
-            
-            // content.body = "This is the body"
-            content.badge = 1
-            var date = DateComponents()
-            date.hour = 8
-            date.minute = 00
-            let trigger = UNCalendarNotificationTrigger(dateMatching: date, repeats: true)
-            
-            //display the notification
-            //let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
-            let request = UNNotificationRequest(identifier: "UVAlert", content: content, trigger: trigger)
-            UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
-        })
+        // when background job finished, do something in main thread
+        //check if it is between hours we want
+        let content = UNMutableNotificationContent()
+        content.setValue(true, forKey: "shouldAlwaysAlertWhileAppIsForeground")
+        content.title = "UV level for "+self.currentLocationCity
+        if(self.uvIndex>=0 && self.uvIndex<=2){
+            content.subtitle = String(self.uvIndex)+" (Low)"
+        }else if(self.uvIndex>=3 && self.uvIndex<=5){
+            content.subtitle = String(self.uvIndex)+" (Moderate)"
+        }else if(self.uvIndex>=6 && self.uvIndex<=7){
+            content.subtitle = String(self.uvIndex)+" (High)"
+        }else if(self.uvIndex>=8 && self.uvIndex<=10){
+            content.subtitle = String(self.uvIndex)+" (Very High)"
+        }else if(self.uvIndex>=11){
+            content.subtitle = String(self.uvIndex)+" (Extreme)"
+        }
+        
+        // content.body = "This is the body"
+        content.badge = 1
+        //var date = DateComponents()
+        //let trigger = UNCalendarNotificationTrigger(dateMatching: date, repeats: false)
+        
+        //display the notification
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+        let request = UNNotificationRequest(identifier: "UVAlert", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+        
     }
     
     
@@ -339,10 +317,8 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
                     //update label HERE
                     DispatchQueue.main.async(execute: { () -> Void in
                         //label.text = "\(responseString)"
-                        self.uvIndexLabel.text = "(No more API requests)"
-                        //self.setCurrentConditionsLabel()
-                        //self.uvIndexDescriptionLabel.lineBreakMode = .byWordWrapping
-                        //self.uvIndexDescriptionLabel.numberOfLines = 0
+                        //self.uvIndexLabel.text = "(No more API requests)"
+                        self.uvIndexText = "(No more API requests)"
                         
                         //self.uvIndexDescriptionLabel.text = self.getUVIndexDescription(uvIndex: self.uvIndex)
                         self.moreInfoButton.isHidden = false //show button
@@ -426,7 +402,6 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
                                 }
                             }
                             //print("json[UVIndexText]: "+String(describing: json!["UVIndexText"]))
-                            
                         }
                         //print("data: "+String(describing: data)+"\n")
                         //print(String(describing: response)+"\n") //debug
@@ -444,7 +419,6 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
     }
     
     @objc func getUVIndexBackground(waitDialog: Bool){
-        
         
         let lat = location.coordinate.latitude
         let lon = location.coordinate.longitude
@@ -468,7 +442,6 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
                     self.currentLocationCity = json!["LocalizedName"] as! String
                     let country = json!["Country"] as AnyObject
                     self.currentLocationCountryCode = (country["ID"] as? String)!
-                    
                     //print(string) //JSONSerialization
                 }
                 //print("data: "+String(describing: data)+"\n")
@@ -516,7 +489,6 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
                             }
                         }
                         //print("json[UVIndexText]: "+String(describing: json!["UVIndexText"]))
-                        
                     }
                     //print("data: "+String(describing: data)+"\n")
                     //print(String(describing: response)+"\n") //debug
@@ -527,9 +499,8 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
             print(error)
         }
         //Update values here
-        
-        //showToast(message: "Lat="+String(location.coordinate.latitude)+" Lon="+String(location.coordinate.longitude))
     }
+    
     
     func setCurrentConditionsLabel()  {
         var weather = String()

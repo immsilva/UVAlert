@@ -27,6 +27,10 @@
 	</dict>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>We need your location info in order to provide accurate data!</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreens</string>
 	<key>UIMainStoryboardFile</key>
