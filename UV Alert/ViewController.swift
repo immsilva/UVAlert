@@ -127,6 +127,33 @@ extension DispatchQueue {
     }
 }
 
+//CHecks if date is between two HH:MM
+extension Date
+{
+    
+    func dateAt(hours: Int, minutes: Int) -> Date
+    {
+        let calendar = NSCalendar(calendarIdentifier: NSCalendar.Identifier.gregorian)!
+        
+        //get the month/day/year componentsfor today's date.
+        
+        
+        var date_components = calendar.components(
+            [NSCalendar.Unit.year,
+             NSCalendar.Unit.month,
+             NSCalendar.Unit.day],
+            from: self)
+        
+        //Create an NSDate for the specified time today.
+        date_components.hour = hours
+        date_components.minute = minutes
+        date_components.second = 0
+        
+        let newDate = calendar.date(from: date_components)!
+        return newDate
+    }
+}
+
 class ViewController: UIViewController, CLLocationManagerDelegate, UNUserNotificationCenterDelegate {
     let apikey = "NiDthNJAAJhvqAeb0L4NB7CPB6YG302t"
     //location manager
@@ -215,15 +242,48 @@ class ViewController: UIViewController, CLLocationManagerDelegate, UNUserNotific
         self.uvIndexLabel.text = "UV level: " + String( self.uvIndex) + " (" + self.uvIndexText + ")"
         //self.uvIndexLabel.text
         self.setCurrentConditionsLabel()
-        sendNotification()
+        //sendNotification()
+        scheduleNotifications()
     }
     
-    //To display notifications when app is running  inforeground
-    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.alert, .sound, .badge])
-    }
 
     
+    func scheduleNotifications() {
+        let now = Date()
+        let six_thirty_today = now.dateAt(hours: 6, minutes: 30)
+        let eight_thirty_today = now.dateAt(hours: 8, minutes: 30)
+        
+        if now >= six_thirty_today && now <= eight_thirty_today
+        {
+            print("Sending notification because time is between 6:30 and 8:30")
+           
+            // create a corresponding local notification
+            let notification = UILocalNotification()
+            notification.fireDate = NSDate(timeIntervalSinceNow: 10) as Date //fire notification in 10 seconds
+            notification.alertTitle = "UV level for "+self.currentLocationCity
+            //notification.alertBody = "Enjoyed your lunch? Don't forget to track your expenses!"
+            
+            //set body of notification
+            if(self.uvIndex>=0 && self.uvIndex<=2){
+                notification.alertBody = String(self.uvIndex)+" (Low)"
+            }else if(self.uvIndex>=3 && self.uvIndex<=5){
+                notification.alertBody = String(self.uvIndex)+" (Moderate)"
+            }else if(self.uvIndex>=6 && self.uvIndex<=7){
+                notification.alertBody = String(self.uvIndex)+" (High)"
+            }else if(self.uvIndex>=8 && self.uvIndex<=10){
+                notification.alertBody = String(self.uvIndex)+" (Very High)"
+            }else if(self.uvIndex>=11){
+                notification.alertBody = String(self.uvIndex)+" (Extreme)"
+            }
+            notification.alertAction = "Check UV level"
+            notification.repeatInterval = NSCalendar.Unit.day    // Repeats the notifications daily
+            notification.applicationIconBadgeNumber=1
+            UIApplication.shared.scheduleLocalNotification(notification)
+        }
+    }
+   
+    /*
+    // Notification implementation (not working)
     func sendNotification(){
         
         print("Sending notification")
@@ -256,7 +316,7 @@ class ViewController: UIViewController, CLLocationManagerDelegate, UNUserNotific
         UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
         
     }
-    
+    */
     
     
     @IBAction func showMoreInfoButton(_ sender: UIButton) {
